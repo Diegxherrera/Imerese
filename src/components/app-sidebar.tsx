@@ -2,14 +2,11 @@
 
 import * as React from "react"
 import {
-  Building2,
   Command,
   Frame,
   LifeBuoy,
   Map,
   PieChart,
-  School,
-  University, GraduationCap
 } from "lucide-react"
 
 import { NavMain } from "@/components/nav-main"
@@ -36,11 +33,11 @@ export const data = {
     {
       title: "Instituto Nebrija",
       url: "/dashboards/instituto_nebrija",
-      icon: University,
+      image: "/nebrija.jpg",
       isActive: true,
       items: [
         {
-          title: "Equipos",
+          title: "Dispositivos",
           url: "/categories/devices/instituto_nebrija",
         },
         {
@@ -56,10 +53,10 @@ export const data = {
     {
       title: "IFPS Puenteuropa",
       url: "/dashboards/puenteuropa",
-      icon: School,
+      image: "/puenteuropa.jpg",
       items: [
         {
-          title: "Equipos",
+          title: "Dispositivos",
           url: "/categories/devices/puenteuropa",
         },
         {
@@ -75,10 +72,10 @@ export const data = {
     {
       title: "Alcazarén Formación",
       url: "/dashboards/alcazaren",
-      icon: GraduationCap,
+      image: "/alcazaren.jpg",
       items: [
         {
-          title: "Equipos",
+          title: "Dispositivos",
           url: "/categories/devices/alcazaren",
         },
         {
@@ -94,10 +91,10 @@ export const data = {
     {
       title: "Fundación CNSE",
       url: "/dashboards/cnse",
-      icon: Building2,
+      image: "/cnse.png",
       items: [
         {
-          title: "Equipos",
+          title: "Dispositivos",
           url: "/categories/devices/cnse",
         },
         {

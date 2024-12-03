@@ -32,7 +32,7 @@ export default function Nebrija_DashboardPage() {
                         </TableHeader>
                         <TableBody>
                             <TableRow>
-                                <TableCell className="font-medium">Equipos</TableCell>
+                                <TableCell className="font-medium">Dispositivos</TableCell>
                                 <TableCell className="text-right">4</TableCell>
                                 <TableCell className="text-right">3600€</TableCell>
                             </TableRow>

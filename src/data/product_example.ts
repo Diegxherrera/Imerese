@@ -3,7 +3,7 @@ export type Product = {
     name: string
     cost: number
     amount: number
-    status: "Pendiente de compra" | "En transito" | "Entregado" | "Desconocido"
+    status: "Pendiente de compra" | "En transito" | "En almacen" | "Desconocido"
     space: "Nebrija" | "CNSE" | "Puenteuropa" | "Alcazaren"
 }
 
@@ -29,7 +29,7 @@ export const example_inventory: Product[] = [
         name: "Camisetas Signalee",
         cost: 60,
         amount: 30,
-        status: "Desconocido",
+        status: "En almacen",
         space: "Nebrija",
     },
 ]

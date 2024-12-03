@@ -1,6 +1,6 @@
 "use client"
 
-import { ChevronRight, type LucideIcon } from "lucide-react"
+import {ChevronRight, Crown} from "lucide-react"
 
 import {
   Collapsible,
@@ -25,7 +25,7 @@ export function NavMain({
   items: {
     title: string
     url: string
-    icon: LucideIcon
+    image: string
     isActive?: boolean
     items?: {
       title: string
@@ -38,12 +38,13 @@ export function NavMain({
       <SidebarGroupLabel>Espacios</SidebarGroupLabel>
       <SidebarMenu>
         {items.map((item) => (
-          <Collapsible key={item.title} asChild defaultOpen={item.isActive}>
+          <Collapsible key={item.title} asChild defaultOpen={item.isActive} >
             <SidebarMenuItem>
               <SidebarMenuButton asChild tooltip={item.title}>
-                <a href={item.url}>
-                  <item.icon />
+                <a href={item.url} className="flex">
+                  <img src={item.image} alt={"Picture"} className={"h-5 w-5 rounded-3xl"}/>
                   <span>{item.title}</span>
+                  {item.title === "Instituto Nebrija" ? <Crown className="h-2.5 w-2.5 text-yellow-600"/> : ""}
                 </a>
               </SidebarMenuButton>
               {item.items?.length ? (
@@ -57,7 +58,7 @@ export function NavMain({
                   <CollapsibleContent>
                     <SidebarMenuSub>
                       {item.items?.map((subItem) => (
-                        <SidebarMenuSubItem key={subItem.title}>
+                        <SidebarMenuSubItem key={subItem.title }>
                           <SidebarMenuSubButton asChild>
                             <a href={subItem.url}>
                               <span>{subItem.title}</span>
