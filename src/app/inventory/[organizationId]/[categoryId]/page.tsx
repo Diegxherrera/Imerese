@@ -1,18 +1,18 @@
-'use client'
+"use client";
 
 import React, { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { columns } from "./columns";
-import { DataTable } from "./data-table";
+import { columns } from "../../inventory/columns";
+import { DataTable } from "../../inventory/data-table";
 import { Product } from "@/data/product_example";
 
 async function fetchData(resource: string): Promise<Product[]> {
-    const response = await fetch(`/api${resource}`, {
+    const response = await fetch(`/api/data/${resource}`, {
         method: "GET",
         headers: {
             "Content-Type": "application/json",
         },
-        cache: "no-store", // Ensure fresh data on every request
+        cache: "no-store",
     });
 
     if (!response.ok) {
@@ -24,7 +24,10 @@ async function fetchData(resource: string): Promise<Product[]> {
 
 export default function DataTablePage() {
     const searchParams = useSearchParams();
-    const resource = searchParams.get("resource") || "/products"; // Default to /products if not specified
+    const organizationId = searchParams.get("organizationId");
+    const categoryId = searchParams.get("categoryId");
+
+    const resource = `${organizationId}/${categoryId}`; // Updated resource construction
 
     const [data, setData] = useState<Product[] | null>(null);
     const [loading, setLoading] = useState(true);
@@ -32,8 +35,15 @@ export default function DataTablePage() {
 
     useEffect(() => {
         async function loadData() {
+            if (!organizationId || !categoryId) {
+                setError("Invalid parameters");
+                setLoading(false);
+                return;
+            }
+
             setLoading(true);
             setError(null);
+
             try {
                 const fetchedData = await fetchData(resource);
                 setData(fetchedData);
@@ -45,8 +55,9 @@ export default function DataTablePage() {
         }
 
         loadData();
-    }, [resource]); // Re-fetch data when the resource changes
+    }, [organizationId, categoryId]);
 
+    // Handle the loading state
     if (loading) {
         return (
             <div className="container">
@@ -55,6 +66,7 @@ export default function DataTablePage() {
         );
     }
 
+    // Handle the error state
     if (error) {
         return (
             <div className="container">
@@ -63,14 +75,16 @@ export default function DataTablePage() {
         );
     }
 
+    // Handle the empty state (no data)
     if (!data || data.length === 0) {
         return (
             <div className="container">
-                <p>No data available.</p>
+                <p>No data available for this category.</p>
             </div>
         );
     }
 
+    // Render the DataTable with data
     return (
         <div className="container">
             <DataTable columns={columns} data={data} />

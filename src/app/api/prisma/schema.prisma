@@ -1,0 +1,33 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL") // Define DATABASE_URL in your .env file
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Organization {
+  id          String       @id @default(uuid())
+  name        String
+  description String
+  categories  Category[]
+}
+
+model Category {
+  id              String       @id @default(uuid())
+  name            String
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id])
+  products        Product[]
+}
+
+model Product {
+  id          String     @id @default(uuid())
+  name        String
+  cost        Float
+  amount      Int
+  status      String     // Example: "Pending Purchase", "In Transit", "Delivered"
+  categoryId  String
+  category    Category   @relation(fields: [categoryId], references: [id])
+}
