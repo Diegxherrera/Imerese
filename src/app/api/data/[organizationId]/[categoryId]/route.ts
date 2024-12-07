@@ -33,6 +33,7 @@ export async function GET(
                 amount: true,
                 status: true,
                 categoryId: true,
+                creationDate: true,
             },
         });
 

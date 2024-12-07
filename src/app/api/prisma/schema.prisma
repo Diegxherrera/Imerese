@@ -30,6 +30,7 @@ model Product {
   cost        Float
   amount      Int
   status      String
+  creationDate DateTime  @default(now()) // Automatically sets the current timestamp
   categoryId  String     @db.Uuid
   category    Category   @relation(fields: [categoryId], references: [id])
 }

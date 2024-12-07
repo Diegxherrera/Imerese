@@ -17,34 +17,57 @@ import {
 import { Checkbox } from "@/components/ui/checkbox"
 
 
-export const StatusCell: React.FC<{ initialStatus: string; onChange: (newStatus: string) => void }> = ({
-    initialStatus,
-    onChange,
-    }) => {
+export const StatusCell: React.FC<{
+    rowId: string;
+    initialStatus: string;
+    organizationId: string;
+    categoryId: string;
+    onChange: (rowId: string, newStatus: string) => void;
+}> = ({ rowId, initialStatus, organizationId, categoryId, onChange }) => {
     const [currentStatus, setCurrentStatus] = React.useState(initialStatus);
 
     const Icon = statusIcons[currentStatus as keyof typeof statusIcons];
 
-    const handleStatusChange = (newStatus: string) => {
+    const handleStatusChange = async (newStatus: string) => {
         setCurrentStatus(newStatus);
-        onChange(newStatus);
+        onChange(rowId, newStatus);
+
+        try {
+            const response = await fetch(
+                `/api/data/${organizationId}/${categoryId}`,
+                {
+                    method: "PUT",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({ productId: rowId, status: newStatus }),
+                }
+            );
+
+            if (!response.ok) {
+                throw new Error("Failed to update status.");
+            }
+
+            const updatedData = await response.json();
+            console.log("Status updated successfully:", updatedData);
+        } catch (error) {
+            console.error("Error updating status:", error);
+        }
     };
 
     return (
         <div className="flex items-center space-x-2">
-            {Icon && <Icon className="h-5 w-5 text-gray-600 ml-4 mr-2" />} {/* Render current icon */}
+            {Icon && <Icon className="h-5 w-5 text-gray-600 ml-4 mr-2" />}
             <Select
-                onValueChange={(value) => handleStatusChange(value)}
-                defaultValue={initialStatus}
+                onValueChange={handleStatusChange}
+                value={currentStatus}
             >
                 <SelectTrigger className="w-[180px]">
                     <SelectValue placeholder="Estado" />
                 </SelectTrigger>
                 <SelectContent>
                     <SelectGroup>
-                        <SelectLabel>
-                            Estado
-                        </SelectLabel>
+                        <SelectLabel>Estado</SelectLabel>
                         <SelectItem value="Pendiente de compra">Pendiente de compra</SelectItem>
                         <SelectItem value="En transito">En tránsito</SelectItem>
                         <SelectItem value="En almacen">En almacén</SelectItem>
@@ -121,17 +144,21 @@ export const columns: ColumnDef<Product>[] = [
                     Estado
                     <ArrowUpDown className="ml-2 h-4 w-4" />
                 </Button>
-            )
+            );
         },
         cell: ({ row }) => {
             const initialStatus: string = row.getValue("status");
+            const rowId: string = row.original.id; // Unique row ID
+            const { organizationId, categoryId } = row.original; // Pass organizationId and categoryId
 
             return (
                 <StatusCell
+                    rowId={rowId}
                     initialStatus={initialStatus}
-                    onChange={(newStatus) => {
-                        console.log(`Row ID: ${row.original.id}, New Status: ${newStatus}`);
-                        // Handle the change (e.g., update the backend or state)
+                    organizationId={organizationId}
+                    categoryId={categoryId}
+                    onChange={(rowId, newStatus) => {
+                        console.log(`Row ID: ${rowId}, New Status: ${newStatus}`);
                     }}
                 />
             );
@@ -140,12 +167,43 @@ export const columns: ColumnDef<Product>[] = [
     {
         accessorKey: "creationDate",
         header: () => <div className="text-center">Fecha de creación</div>,
-        cell: ({ }) => {
+        cell: ({ getValue }) => {
+            // Explicitly cast the value returned by getValue to string | number | Date
+            const rawValue = getValue() as string | number | Date;
+            const creationDate = rawValue ? new Date(rawValue) : null; // Ensure the value is valid
 
-            return (
-                <div className="text-center">Wait</div>
-            )
-        }
+            let formattedDate = "N/A"; // Default fallback
+
+            if (creationDate) {
+                const now = new Date();
+                const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                const yesterday = new Date(today);
+                yesterday.setDate(today.getDate() - 1);
+
+                if (creationDate >= today) {
+                    formattedDate = `Hoy a las ${creationDate.toLocaleTimeString("es-ES", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                    })}`;
+                } else if (creationDate >= yesterday && creationDate < today) {
+                    formattedDate = `Ayer a las ${creationDate.toLocaleTimeString("es-ES", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                    })}`;
+                } else {
+                    formattedDate = `${creationDate.toLocaleDateString("es-ES", {
+                        day: "2-digit",
+                        month: "2-digit",
+                        year: "numeric",
+                    })} | ${creationDate.toLocaleTimeString("es-ES", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                    })}`;
+                }
+            }
+
+            return <div className="text-center">{formattedDate}</div>;
+        },
     },
     {
         accessorKey: "amount",
@@ -160,7 +218,7 @@ export const columns: ColumnDef<Product>[] = [
     },
     {
         accessorKey: "cost",
-        header: () => <div className="text-right">Precio</div>,
+        header: () => <div className="text-center">Precio</div>,
         cell: ({ row }) => {
             const cost = parseFloat(row.getValue("cost"))
             const formatted = new Intl.NumberFormat("es-ES", {
@@ -168,7 +226,7 @@ export const columns: ColumnDef<Product>[] = [
                 currency: "EUR",
             }).format(cost)
 
-            return <div className="text-right font-medium">{formatted}</div>
+            return <div className="text-center font-medium">{formatted}</div>
         },
     },
 ]
