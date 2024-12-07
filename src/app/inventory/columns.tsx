@@ -143,7 +143,7 @@ export const columns: ColumnDef<Product>[] = [
         cell: ({ }) => {
 
             return (
-                <div className="text-center">{"Leticia Sabater"}</div>
+                <div className="text-center">Wait</div>
             )
         }
     },

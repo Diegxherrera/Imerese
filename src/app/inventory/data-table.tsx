@@ -59,16 +59,16 @@ interface DataTableProps<TData extends Product, TValue> {
 }
 
 export function DataTable<TData extends Product, TValue>({                                                                     columns,
-                                                                     data,
-                                                                     categoryName,
-                                                                     organizationName,
-                                                                     setDataAction,
-                                                                 }: DataTableProps<TData, TValue>) {
+        data,
+        categoryName,
+        organizationName,
+        setDataAction,
+    }: DataTableProps<TData, TValue>) {
     const [sorting, setSorting] = React.useState<SortingState>([]);
     const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
     const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
     const [rowSelection, setRowSelection] = React.useState({});
-    const [newRowsData, setNewRowsData] = React.useState<Partial<Product>[]>([]); // Array of new rows
+    const [newRowsData, setNewRowsData] = React.useState<Partial<Product>[]>([]);
     const [editableRows, setEditableRows] = React.useState<Record<string, boolean>>({});
     const [editedRows, setEditedRows] = React.useState<{
         [id: string]: Partial<Product>;
@@ -140,6 +140,13 @@ export function DataTable<TData extends Product, TValue>({                      
                 )
             );
 
+            // Check for failures in the responses
+            responses.forEach((response, index) => {
+                if (!response.ok) {
+                    console.error(`Failed to save row ${index}:`, response.statusText);
+                }
+            });
+
             // Handle API Responses
             const savedProducts = await Promise.all(responses.map((res) => res.json()));
 
@@ -156,13 +163,13 @@ export function DataTable<TData extends Product, TValue>({                      
                 action: <ToastAction altText="Cerrar">Cerrar</ToastAction>,
             });
         } catch (error) {
+            console.error("Error saving changes:", error);
             toast({
                 variant: "destructive",
                 title: "Error",
                 description: "Ocurrió un error al guardar los cambios.",
                 action: <ToastAction altText="Reintentar">Reintentar</ToastAction>,
             });
-            console.error("Error saving changes:", error);
         }
     }
 
@@ -293,6 +300,22 @@ export function DataTable<TData extends Product, TValue>({                      
         }
     }
 
+    function isNewRowValid(): boolean {
+        if (newRowsData.length === 0) {
+            return false; // Button should remain disabled if no rows are created
+        }
+
+        const firstRow = newRowsData[0]; // Check the first row
+        return (
+            firstRow.name &&
+            firstRow.status !== undefined && // Allow "Desconocido"
+            firstRow.amount !== undefined &&
+            firstRow.cost !== undefined &&
+            !isNaN(firstRow.cost) &&
+            !isNaN(firstRow.amount)
+        );
+    }
+
     const handleEditToggle = (rowId: string) => {
         setEditableRows((prev) => ({
             ...prev,
@@ -323,14 +346,11 @@ export function DataTable<TData extends Product, TValue>({                      
         }));
     };
 
-    const isProductKey = (key: string): key is keyof Product => {
-        return ["name", "amount", "cost", "status", "creationDate"].includes(key);
-    };
-
     const addNewRow = () => {
         setNewRowsData((prev) => [
             ...prev,
             {  id: uuidv4(),
+                status: "Desconocido", // Default to "Desconocido"
                 creationDate: new Date().toLocaleDateString("es-ES") },
         ]);
     };
@@ -445,7 +465,14 @@ export function DataTable<TData extends Product, TValue>({                      
 
                                         return (
                                             <TableCell key={cell.id}>
-                                                {isEditable ? (
+                                                {isEditable && columnId === "status" ? (
+                                                    <StatusCell
+                                                        initialStatus={editedRows[row.original.id]?.status ?? cell.getValue()}
+                                                        onChange={(newStatus) =>
+                                                            handleInputChange(row.original.id, "status", newStatus)
+                                                        }
+                                                    />
+                                                ) : isEditable ? (
                                                     <Input
                                                         value={
                                                             editedRows[row.original.id]?.[columnId as keyof Product] ??
@@ -602,7 +629,7 @@ export function DataTable<TData extends Product, TValue>({                      
                     size="sm"
                     className="bg-blue-600 text-white hover:bg-blue-700"
                     onClick={saveChanges}
-                    disabled={false}
+                    disabled={!isNewRowValid()}
                 >
                     Guardar cambios
                 </Button>
