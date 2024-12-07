@@ -27,26 +27,26 @@ export const data = {
   user: {
     name: "Jose Carlos",
     email: "jc@nebrija.es",
-    avatar: "/avatars/shadcn.jpg",
+    avatar: "",
   },
   navMain: [
     {
       title: "Instituto Nebrija",
-      url: "/dashboards/instituto_nebrija",
+      url: "/dashboards/nebrija",
       image: "/nebrija.jpg",
       isActive: true,
       items: [
         {
           title: "Dispositivos",
-          url: "/categories/devices/instituto_nebrija",
+          url: "/inventory/nebrija/devices",
         },
         {
           title: "Activos Digitales",
-          url: "/categories/digital/instituto_nebrija",
+          url: "/inventory/nebrija/digital_assets",
         },
         {
           title: "Materiales",
-          url: "/categories/materials/instituto_nebrija",
+          url: "/inventory/nebrija/materials",
         },
       ],
     },
@@ -57,15 +57,15 @@ export const data = {
       items: [
         {
           title: "Dispositivos",
-          url: "/categories/devices/puenteuropa",
+          url: "/inventory/puenteuropa/devices",
         },
         {
           title: "Activos Digitales",
-          url: "/categories/digital/puenteuropa",
+          url: "/inventory/puenteuropa/digital_assets",
         },
         {
           title: "Materiales",
-          url: "/categories/materials/puenteuropa",
+          url: "/inventory/puenteuropa/materials",
         },
       ],
     },
@@ -76,15 +76,15 @@ export const data = {
       items: [
         {
           title: "Dispositivos",
-          url: "/categories/devices/alcazaren",
+          url: "/inventory/alcazaren/devices",
         },
         {
           title: "Activos Digitales",
-          url: "/categories/digital/alcazaren",
+          url: "/inventory/alcazaren/digital_assets",
         },
         {
           title: "Materiales",
-          url: "/categories/materials/alcazaren",
+          url: "/inventory/alcazaren/materials",
         },
       ],
     },
@@ -95,19 +95,19 @@ export const data = {
       items: [
         {
           title: "Dispositivos",
-          url: "/categories/devices/cnse",
+          url: "/inventory/cnse/devices",
         },
         {
           title: "Activos Digitales",
-          url: "/categories/digital/cnse",
+          url: "/inventory/cnse/digital_assets",
         },
         {
           title: "Materiales",
-          url: "/categories/materials/cnse",
+          url: "/inventory/cnse/materials",
         },
         {
           title: "Servicios prestados/por prestar",
-          url: "/categories/materials/cnse",
+          url: "/inventory/cnse/services",
         },
       ],
     },
@@ -136,7 +136,7 @@ export const data = {
       icon: Map,
     },
   ],
-}
+};
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
@@ -150,8 +150,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   <Command className="size-4" />
                 </div>
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-semibold">Signalee</span>
-                  <span className="truncate text-xs">Proyectos Solidarios</span>
+                  <span className="truncate font-semibold">Proyectos Solidarios</span>
+                  <span className="truncate text-xs">Powered by Imerese</span>
                 </div>
               </a>
             </SidebarMenuButton>
