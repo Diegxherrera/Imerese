@@ -18,13 +18,15 @@ import { Checkbox } from "@/components/ui/checkbox"
 
 
 export const StatusCell: React.FC<{
-    rowId: string;
+    rowId: string; // Required for existing rows
     initialStatus: string;
-    organizationId: string;
-    categoryId: string;
-    onChange: (rowId: string, newStatus: string) => void;
-}> = ({ rowId, initialStatus, organizationId, categoryId, onChange }) => {
+    organizationId: string | null;
+    categoryId: string | null;
+    isNewRow?: boolean; // Optional, defaults to false for existing rows
+    onChange: (rowId: string | null, newStatus: string) => void; // rowId is required for existing rows
+}> = ({ rowId, initialStatus, organizationId, categoryId, isNewRow = false, onChange }) => {
     const [currentStatus, setCurrentStatus] = React.useState(initialStatus);
+    const [isUpdating, setIsUpdating] = React.useState(false); // Tracks backend update status
 
     const Icon = statusIcons[currentStatus as keyof typeof statusIcons];
 
@@ -32,7 +34,11 @@ export const StatusCell: React.FC<{
         setCurrentStatus(newStatus);
         onChange(rowId, newStatus);
 
+        // Skip backend update if it's a new row
+        if (isNewRow) return;
+
         try {
+            setIsUpdating(true); // Start loading indicator
             const response = await fetch(
                 `/api/data/${organizationId}/${categoryId}`,
                 {
@@ -52,6 +58,10 @@ export const StatusCell: React.FC<{
             console.log("Status updated successfully:", updatedData);
         } catch (error) {
             console.error("Error updating status:", error);
+            // Optionally show a toast or revert the status change
+            setCurrentStatus(initialStatus); // Revert to the previous status on error
+        } finally {
+            setIsUpdating(false); // Stop loading indicator
         }
     };
 
@@ -61,6 +71,7 @@ export const StatusCell: React.FC<{
             <Select
                 onValueChange={handleStatusChange}
                 value={currentStatus}
+                disabled={isUpdating} // Disable while updating to prevent duplicate requests
             >
                 <SelectTrigger className="w-[180px]">
                     <SelectValue placeholder="Estado" />

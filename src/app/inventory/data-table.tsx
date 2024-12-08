@@ -10,7 +10,7 @@ import {
     SortingState,
     VisibilityState,
     useReactTable,
-    ColumnFiltersState,
+    ColumnFiltersState, HeaderContext,
 } from "@tanstack/react-table"
 import jsPDF from "jspdf";
 import "jspdf-autotable"; // Ensure you have installed jspdf-autotable
@@ -42,6 +42,7 @@ import { Input } from "@/components/ui/input"
 import React from "react";
 import {Product} from "@/data/product_example";
 import {
+    Braces,
     ChevronDown,
     CircleCheckBig,
     FileSpreadsheet,
@@ -53,7 +54,6 @@ import {
 } from "lucide-react";
 import {StatusCell} from "@/app/inventory/columns";
 import {Checkbox} from "@/components/ui/checkbox";
-import {timestamp} from "yaml/dist/schema/yaml-1.1/timestamp";
 
 interface DataTableProps<TData extends Product, TValue> {
     columns: ColumnDef<TData, TValue>[];
@@ -64,11 +64,11 @@ interface DataTableProps<TData extends Product, TValue> {
 }
 
 export function DataTable<TData extends Product, TValue>({                                                                     columns,
-        data,
-        categoryName,
-        organizationName,
-        setDataAction,
-    }: DataTableProps<TData, TValue>) {
+                                                             data,
+                                                             categoryName,
+                                                             organizationName,
+                                                             setDataAction,
+                                                         }: DataTableProps<TData, TValue>) {
     const [sorting, setSorting] = React.useState<SortingState>([]);
     const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
     const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
@@ -190,10 +190,13 @@ export function DataTable<TData extends Product, TValue>({                      
     }
 
     function exportTableToPDF(
-        organizationName: string, // Name of the organization
+        organizationName: string | null, // Name of the organization
         categoryName: string, // Name of the category
         tableData: RowData[], // Array of data rows
-        columns: ColumnDef[] // Array of column definitions
+        columns: {
+            header: string | ((props: HeaderContext<unknown, unknown>) => any) | undefined;
+            accessorKey: string
+        }[] // Array of column definitions
     ): void {
         const doc = new jsPDF({
             orientation: "portrait",
@@ -264,7 +267,34 @@ export function DataTable<TData extends Product, TValue>({                      
         doc.save(`${translatedOrganizationName}_${categoryName}_${timestamp}.pdf`);
     }
 
-    function exportTableToExcel(organizationName: string, categoryName: string, tableData: RowData[], columns: ColumnDef[]): void {
+    function exportTableToJSON(tableData: Record<string, any>[], columns: ColumnDef<any, any>[]): void {
+        // Prepare JSON data
+        const jsonData = tableData.map((row) => {
+            const formattedRow: Record<string, any> = {};
+
+            columns
+                .filter((col) => col.accessorKey !== "id" && col.accessorKey !== "select") // Exclude private fields
+                .forEach((col) => {
+                    formattedRow[col.accessorKey] = row[col.accessorKey];
+                });
+
+            return formattedRow;
+        });
+
+        // Create a Blob and trigger download
+        const jsonBlob = new Blob([JSON.stringify(jsonData, null, 2)], { type: "application/json" });
+        const link = document.createElement("a");
+        const filename = "data-table.json";
+        const url = URL.createObjectURL(jsonBlob);
+        link.setAttribute("href", url);
+        link.setAttribute("download", filename);
+        link.style.visibility = "hidden";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
+    function exportTableToExcel(organizationName: string | null, categoryName: string | undefined, tableData: RowData[], columns: ColumnDef<TData, TValue>[]): void {
         // Translation mapping for headers
         const headerTranslations = {
             status: "Estado",
@@ -301,7 +331,7 @@ export function DataTable<TData extends Product, TValue>({                      
         XLSX.writeFile(workbook, filename);
     }
 
-    function exportTableToCSV(organizationName: string, categoryName: string, tableData: RowData[], columns: ColumnDef[]) {
+    function exportTableToCSV(organizationName: string | null, categoryName: string | undefined, tableData: RowData[], columns: ColumnDef<TData, TValue>[]) {
         // Translation mapping for headers
         const headerTranslations = {
             status: "Estado",
@@ -415,27 +445,32 @@ export function DataTable<TData extends Product, TValue>({                      
     };
 
     async function handleEditRow(rowId: string) {
-        const updatedData = editedRows[rowId];
-        if (!updatedData) {
-            // Close the edit menu
-            setEditableRows((prev) => ({
-                ...prev,
-                [rowId]: false,
-            }));
+        const isNewRow = newRowsData.some((row) => row.id === rowId);
+        const updatedData = isNewRow
+            ? newRowsData.find((row) => row.id === rowId)
+            : editedRows[rowId];
 
-            return; // Exit early since there's no data to update
+        if (!updatedData) {
+            console.error("No data to update for row:", rowId);
+            return;
         }
 
         console.log("Payload being sent:", { productId: rowId, ...updatedData });
 
         try {
-            const response = await fetch(`/api/data/${organizationName}/${categoryName}`, {
-                method: "PUT",
+            // Different API logic for new rows vs existing rows
+            const apiUrl = isNewRow
+                ? `/api/data/${organizationName}/${categoryName}` // POST endpoint for new rows
+                : `/api/data/${organizationName}/${categoryName}`; // PUT endpoint for existing rows
+            const method = isNewRow ? "POST" : "PUT";
+
+            const response = await fetch(apiUrl, {
+                method,
                 headers: {
                     "Content-Type": "application/json",
                 },
                 body: JSON.stringify({
-                    productId: rowId, // Backend UUID
+                    productId: isNewRow ? undefined : rowId, // Don't send `productId` for new rows
                     ...updatedData,
                 }),
             });
@@ -446,10 +481,21 @@ export function DataTable<TData extends Product, TValue>({                      
 
             const updatedRow = await response.json();
 
-            if (setDataAction) {
-                setDataAction((prev) =>
-                    prev.map((row) => (row.id === rowId ? { ...row, ...updatedRow } : row))
-                );
+            if (isNewRow) {
+                // Update the newRowsData
+                setNewRowsData((prev) => prev.filter((row) => row.id !== rowId));
+
+                // Add the new row to the main data set
+                if (setDataAction) {
+                    setDataAction((prev) => (prev ? [...prev, updatedRow] : [updatedRow]));
+                }
+            } else {
+                // Update the existing rows in the data set
+                if (setDataAction) {
+                    setDataAction((prev) =>
+                        prev.map((row) => (row.id === rowId ? { ...row, ...updatedRow } : row))
+                    );
+                }
             }
 
             toast({
@@ -458,17 +504,18 @@ export function DataTable<TData extends Product, TValue>({                      
                 description: "Los cambios se han guardado correctamente.",
             });
 
-            setEditableRows((prev) => ({
-                ...prev,
-                [rowId]: false,
-            }));
-
-            setEditedRows((prev) => {
-                const updated = { ...prev };
-                delete updated[rowId];
-                return updated;
-            });
-
+            // Clear editing state for existing rows
+            if (!isNewRow) {
+                setEditableRows((prev) => ({
+                    ...prev,
+                    [rowId]: false,
+                }));
+                setEditedRows((prev) => {
+                    const updated = { ...prev };
+                    delete updated[rowId];
+                    return updated;
+                });
+            }
         } catch (error) {
             console.error("Error during row update:", error);
             toast({
@@ -487,7 +534,6 @@ export function DataTable<TData extends Product, TValue>({                      
         const firstRow = newRowsData[0]; // Check the first row
         return (
             firstRow.name &&
-            firstRow.status !== undefined && // Allow "Desconocido"
             firstRow.amount !== undefined &&
             firstRow.cost !== undefined &&
             !isNaN(firstRow.cost) &&
@@ -572,7 +618,7 @@ export function DataTable<TData extends Product, TValue>({                      
                                     // Validate the data before exporting
                                     if (!tableData.length || !columns.length) {
                                         console.error("Table data or columns are invalid");
-                                        console.log(tableData.toString())
+
                                         return;
                                     }
 
@@ -594,7 +640,7 @@ export function DataTable<TData extends Product, TValue>({                      
                                     columns
                                 )}
                             >
-                                <FileSpreadsheet />
+                                <Sheet />
                                 Excel
                             </Button>
                             <Button
@@ -609,8 +655,29 @@ export function DataTable<TData extends Product, TValue>({                      
                                     columns
                                 )}
                             >
-                                <FileText />
+                                <FileSpreadsheet />
                                 CSV
+                            </Button>
+                            <Button
+                                variant="ghost"
+                                onClick={() => {
+                                    const tableData = table.getRowModel()?.rows?.map((row) => row.original) || [];
+                                    const columns = table.getAllColumns()?.map((col) => ({
+                                        accessorKey: col.id,
+                                        header: col.columnDef.header,
+                                    })) || [];
+
+                                    // Validate data before exporting
+                                    if (!tableData.length || !columns.length) {
+                                        console.error("Table data or columns are invalid");
+                                        return;
+                                    }
+
+                                    exportTableToJSON(tableData, columns);
+                                }}
+                            >
+                                <Braces />
+                                JSON
                             </Button>
                         </DropdownMenuContent>
                     </DropdownMenu>
@@ -676,6 +743,7 @@ export function DataTable<TData extends Product, TValue>({                      
                         {table.getRowModel().rows.length > 0 ? (
                             table.getRowModel().rows.map((row) => (
                                 <TableRow key={row.id}>
+                                    {/* For existing rows */}
                                     {row.getVisibleCells().map((cell) => {
                                         const columnId = cell.column.id;
                                         const isEditable =
@@ -686,9 +754,13 @@ export function DataTable<TData extends Product, TValue>({                      
                                             <TableCell key={cell.id}>
                                                 {isEditable && columnId === "status" ? (
                                                     <StatusCell
+                                                        rowId={row.original.id}
                                                         initialStatus={editedRows[row.original.id]?.status ?? cell.getValue()}
-                                                        onChange={(newStatus) =>
-                                                            handleInputChange(row.original.id, "status", newStatus)
+                                                        organizationId={organizationName} // Pass organization name
+                                                        categoryId={categoryName} // Pass category name
+                                                        isNewRow={false} // Explicitly mark it as an existing row
+                                                        onChange={(rowId, newStatus) =>
+                                                            handleInputChange(rowId, "status", newStatus)
                                                         }
                                                     />
                                                 ) : isEditable ? (
@@ -740,7 +812,7 @@ export function DataTable<TData extends Product, TValue>({                      
                         ) : null
                         }
 
-                        {/* Render new rows */}
+                        {/* For new rows */}
                         {newRowsData.map((rowData, index) => (
                             <TableRow key={`new-${index}`}>
                                 <TableCell>
@@ -763,9 +835,8 @@ export function DataTable<TData extends Product, TValue>({                      
                                 <TableCell className="justify-center">
                                     <StatusCell
                                         initialStatus={"Desconocido"}
-                                        onChange={(newStatus) =>
-                                            handleNewRowChange(index, "status", newStatus)
-                                        }
+                                        isNewRow={true} // Indicates this is a new row
+                                        onChange={(_, newStatus) => handleNewRowChange(index, "status", newStatus)} // rowId is irrelevant for new rows
                                     />
                                 </TableCell>
                                 <TableCell>
