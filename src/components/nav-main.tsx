@@ -44,7 +44,7 @@ export function NavMain({
                 <a href={item.url} className="flex">
                   <img src={item.image} alt={"Picture"} className={"h-5 w-5 rounded-3xl"}/>
                   <span>{item.title}</span>
-                  {item.title === "Instituto Nebrija" ? <Crown className="h-2.5 w-2.5 text-yellow-600"/> : ""}
+                  {item.title === "Instituto Nebrija" ? <Crown className="h-2.5 w-2.5 text-yellow-500"/> : ""}
                 </a>
               </SidebarMenuButton>
               {item.items?.length ? (

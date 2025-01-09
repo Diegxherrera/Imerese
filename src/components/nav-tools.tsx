@@ -5,7 +5,7 @@ import {
   MoreHorizontal,
   Share,
   Trash2,
-  type LucideIcon,
+  type LucideIcon, Eye,
 } from "lucide-react"
 
 import {
@@ -25,9 +25,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar"
 
-export function NavTools({
-  tools,
-}: {
+export function NavTools({ tools }: {
   tools: {
     name: string
     url: string
@@ -61,13 +59,13 @@ export function NavTools({
                 align={isMobile ? "end" : "start"}
               >
                 <DropdownMenuItem>
-                  <Folder className="text-muted-foreground" />
+                  <Eye className="text-muted-foreground" />
                   <span>Ver herramienta</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem>
-                  <Trash2 className="text-muted-foreground" />
-                  <span>Delete Project</span>
+                  <Share className="text-muted-foreground" />
+                  <span>Compartir</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

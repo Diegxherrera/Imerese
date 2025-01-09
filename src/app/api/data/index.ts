@@ -8,7 +8,7 @@ export async function GET() {
     const spaces = await prisma.organization.findMany();
     return NextResponse.json(spaces, { status: 200 });
 }
-a
+
 // POST: Add a new organization
 export async function POST(req: NextRequest) {
     const body = await req.json();

@@ -5,7 +5,7 @@ import {
   Command,
   Frame,
   LifeBuoy,
-  Map,
+  Map, Package,
   PieChart,
 } from "lucide-react"
 
@@ -32,7 +32,7 @@ export const data = {
   navMain: [
     {
       title: "Instituto Nebrija",
-      url: "/dashboards/nebrija",
+      url: "/dashboard/nebrija",
       image: "/nebrija.jpg",
       isActive: true,
       items: [
@@ -52,7 +52,7 @@ export const data = {
     },
     {
       title: "IFPS Puenteuropa",
-      url: "/dashboards/puenteuropa",
+      url: "/dashboard/puenteuropa",
       image: "/puenteuropa.jpg",
       items: [
         {
@@ -71,7 +71,7 @@ export const data = {
     },
     {
       title: "Alcazarén Formación",
-      url: "/dashboards/alcazaren",
+      url: "/dashboard/alcazaren",
       image: "/alcazaren.jpg",
       items: [
         {
@@ -90,7 +90,7 @@ export const data = {
     },
     {
       title: "Fundación CNSE",
-      url: "/dashboards/cnse",
+      url: "/dashboard/cnse",
       image: "/cnse.png",
       items: [
         {
@@ -121,9 +121,9 @@ export const data = {
   ],
   tools: [
     {
-      name: "Diseño de pedidos",
+      name: "Pedidos",
       url: "#",
-      icon: Frame,
+      icon: Package,
     },
     {
       name: "Estadísticas",
@@ -141,7 +141,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
               <a href="#">
-                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-red-600 text-sidebar-primary-foreground">
+                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-yellow-500 text-sidebar-primary-foreground">
                   <Command className="size-4" />
                 </div>
                 <div className="grid flex-1 text-left text-sm leading-tight">

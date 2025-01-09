@@ -39,7 +39,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 
-import React from "react";
+import React, {useRef, useState} from "react";
 import {Product} from "@/data/product_example";
 import {
     Braces,
@@ -54,13 +54,23 @@ import {
 } from "lucide-react";
 import {StatusCell} from "@/app/inventory/columns";
 import {Checkbox} from "@/components/ui/checkbox";
+import {SidebarProvider} from "@/components/ui/sidebar";
+import {
+    AlertDialog, AlertDialogAction, AlertDialogCancel,
+    AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger
+} from "@/components/ui/alert-dialog";
+import {importCSVtoTable, importJSONtoTable} from "@/scripts/dataTransferUtils";
+import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from "@/components/ui/tooltip";
 
 interface DataTableProps<TData extends Product, TValue> {
     columns: ColumnDef<TData, TValue>[];
     data: TData[];
     categoryName: string | undefined;
     organizationName: string | null;
-    setDataAction: React.Dispatch<React.SetStateAction<TData[]>> | null;
+    setDataAction: React.Dispatch<React.SetStateAction<TData[]>>;
 }
 
 export function DataTable<TData extends Product, TValue>({                                                                     columns,
@@ -78,8 +88,12 @@ export function DataTable<TData extends Product, TValue>({                      
     const [editedRows, setEditedRows] = React.useState<{
         [id: string]: Partial<Product>;
     }>({});
-
+    const [showDeleteDialog, setShowDeleteDialog] = useState(false); // Control dialog visibility
+    const [confirmDelete, setConfirmDelete] = useState(false); // Trigger delete confirmation
     const { toast } = useToast();
+    const csvInputRef = useRef<HTMLInputElement>(null)
+    const jsonInputRef = useRef<HTMLInputElement>(null)
+
 
     const categoryTitles: Record<string, string> = {
         devices: "Dispositivos",
@@ -116,6 +130,26 @@ export function DataTable<TData extends Product, TValue>({                      
         },
     });
 
+    React.useEffect(() => {
+        const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+            // Check for unsaved new rows or edited rows
+            if (newRowsData.length > 0 || Object.keys(editedRows).length > 0) {
+                // Modern browsers ignore custom text, but we still set returnValue
+                event.preventDefault()
+                event.returnValue =
+                    "Si recargas la página, perderás los cambios sin guardar."
+            }
+        }
+
+        // Attach event
+        window.addEventListener("beforeunload", handleBeforeUnload)
+
+        // Cleanup to avoid multiple listeners
+        return () => {
+            window.removeEventListener("beforeunload", handleBeforeUnload)
+        }
+    }, [newRowsData, editedRows])
+
     async function saveChanges() {
         // Validate new rows
         const hasInvalidRows = newRowsData.some(
@@ -132,7 +166,6 @@ export function DataTable<TData extends Product, TValue>({                      
                 variant: "destructive",
                 title: "Error",
                 description: "Por favor complete todos los campos requeridos en las filas nuevas.",
-                action: <ToastAction altText="Cerrar">Cerrar</ToastAction>,
             });
             return;
         }
@@ -176,14 +209,13 @@ export function DataTable<TData extends Product, TValue>({                      
                 variant: "default",
                 title: "¡Éxito!",
                 description: "Los cambios se han guardado correctamente.",
-                action: <ToastAction altText="Cerrar">Cerrar</ToastAction>,
             });
         } catch (error) {
             console.error("Error saving changes:", error);
             toast({
                 variant: "destructive",
                 title: "Error",
-                description: "Ocurrió un error al guardar los cambios.",
+                description: "Error al guardar los cambios.",
                 action: <ToastAction altText="Reintentar">Reintentar</ToastAction>,
             });
         }
@@ -377,6 +409,7 @@ export function DataTable<TData extends Product, TValue>({                      
         document.body.removeChild(link);
     }
 
+
     const handleDelete = async () => {
         if (!data || !setDataAction) {
             console.error("Data or setDataAction is not available");
@@ -389,7 +422,7 @@ export function DataTable<TData extends Product, TValue>({                      
             return; // Do nothing if no rows are selected
         }
 
-        if (window.confirm("¿Estás seguro de que deseas eliminar las filas seleccionadas?")) {
+        if (confirmDelete) {
             try {
                 // Send DELETE request for each selected product
                 const responses = await Promise.all(
@@ -420,9 +453,9 @@ export function DataTable<TData extends Product, TValue>({                      
                 setDataAction(remainingRows);
 
                 toast({
-                    variant: "default",
-                    title: "¡Éxito!",
-                    description: `${selectedRows.length} fila(s) eliminadas correctamente.`,
+                    variant: "success",
+                    title: "Eliminando filas",
+                    description: `${selectedRows[0].id} fila(s) eliminada(s) correctamente.`,
                 });
             } catch (error) {
                 toast({
@@ -432,11 +465,22 @@ export function DataTable<TData extends Product, TValue>({                      
                     action: <ToastAction altText="Reintentar">Reintentar</ToastAction>,
                 });
                 console.error("Error deleting rows:", error);
+            } finally {
+                setConfirmDelete(false); // Reset the confirmation state
             }
         }
     };
 
     const handleNewRowChange = (index: number, field: keyof Product, value: string | number) => {
+        // If this is a numeric field, ensure it's a valid number
+        if ((field === "amount" || field === "cost") && Number.isNaN(Number(value))) {
+            toast({
+                variant: "destructive",
+                title: "Campo inválido",
+                description: `La columna "${field}" solo acepta números.`,
+            });
+        }
+
         setNewRowsData((prev) =>
             prev.map((row, i) =>
                 i === index ? { ...row, [field]: value } : row
@@ -451,8 +495,11 @@ export function DataTable<TData extends Product, TValue>({                      
             : editedRows[rowId];
 
         if (!updatedData) {
-            console.error("No data to update for row:", rowId);
-            return;
+            toast({
+                variant: "default",
+                title: "Nada que actualizar.",
+                description: "No hay ningún campo que actualizar.",
+            });
         }
 
         console.log("Payload being sent:", { productId: rowId, ...updatedData });
@@ -475,10 +522,6 @@ export function DataTable<TData extends Product, TValue>({                      
                 }),
             });
 
-            if (!response.ok) {
-                throw new Error("Failed to update the row.");
-            }
-
             const updatedRow = await response.json();
 
             if (isNewRow) {
@@ -498,11 +541,13 @@ export function DataTable<TData extends Product, TValue>({                      
                 }
             }
 
-            toast({
-                variant: "default",
-                title: "¡Éxito!",
-                description: "Los cambios se han guardado correctamente.",
-            });
+            if (updatedData) {
+                toast({
+                    variant: "default",
+                    title: "¡Éxito!",
+                    description: "Los cambios se han guardado correctamente.",
+                });
+            }
 
             // Clear editing state for existing rows
             if (!isNewRow) {
@@ -562,6 +607,14 @@ export function DataTable<TData extends Product, TValue>({                      
         column: keyof Product,
         value: string | number
     ) => {
+        if ((column === "amount" || column === "cost") && Number.isNaN(Number(value))) {
+            toast({
+                variant: "destructive",
+                title: "Campo inválido",
+                description: `La columna "${column}" solo acepta números.`,
+            });
+            return; // Don't update the state if invalid
+        }
         setEditedRows((prev) => ({
             ...prev,
             [rowId]: {
@@ -592,100 +645,167 @@ export function DataTable<TData extends Product, TValue>({                      
     console.log("New Rows Initial Value: " + newRowsData)
 
     return (
-        <div>
+        <SidebarProvider className="flex flex-col w-full mx-5">
             <div className="flex flex-row justify-between mb-3">
                 <div className="text-2xl ml-1 flex justify-end items-end">
-                    <span className="font-bold">Inventario</span>&nbsp;/&nbsp;{categoryName === undefined ? "Error" : categoryTitles[categoryName]}
+                    <span
+                        className="font-bold">Inventario</span>&nbsp;/&nbsp;{categoryName === undefined ? "Error" : categoryTitles[categoryName]}
                 </div>
                 <div className="flex flex-row space-x-4">
+                    {/* Import valid formats */}
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button variant="outline" className="ml-auto">
-                                Exportar
+                                Importar
                                 <ChevronDown />
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="start" className="items-start">
+                            {/* ===== JSON ===== */}
                             <Button
                                 variant="ghost"
-                                onClick={() => {
-                                    const tableData = table.getRowModel()?.rows?.map((row) => row.original) || [];
-                                    const columns = table.getAllColumns()?.map((col) => ({
-                                        accessorKey: col.id,
-                                        header: col.columnDef.header,
-                                    })) || [];
-
-                                    // Validate the data before exporting
-                                    if (!tableData.length || !columns.length) {
-                                        console.error("Table data or columns are invalid");
-
-                                        return;
-                                    }
-
-                                    exportTableToPDF(organizationName, categoryTitles[categoryName], data, columns);
-                                }}
-                            >
-                                <FileText />
-                                PDF
-                            </Button>
-                            <Button
-                                variant="ghost"
-                                onClick={() => exportTableToExcel(
-                                    organizationName === "nebrija" ? "Instituto Nebrija" :
-                                        organizationName === "alcazaren" ? "Alcazarén Formación" :
-                                            organizationName === "puenteuropa" ? "IFPS Puenteuropa" :
-                                                organizationName === "cnse" ? "Fundación CNSE" : organizationName,
-                                    categoryName,
-                                    data,
-                                    columns
-                                )}
-                            >
-                                <Sheet />
-                                Excel
-                            </Button>
-                            <Button
-                                variant="ghost"
-                                onClick={() => exportTableToCSV(
-                                    organizationName === "nebrija" ? "Instituto Nebrija" :
-                                        organizationName === "alcazaren" ? "Alcazarén Formación" :
-                                            organizationName === "puenteuropa" ? "IFPS Puenteuropa" :
-                                                organizationName === "cnse" ? "Fundación CNSE" : organizationName,
-                                    categoryName,
-                                    data,
-                                    columns
-                                )}
-                            >
-                                <FileSpreadsheet />
-                                CSV
-                            </Button>
-                            <Button
-                                variant="ghost"
-                                onClick={() => {
-                                    const tableData = table.getRowModel()?.rows?.map((row) => row.original) || [];
-                                    const columns = table.getAllColumns()?.map((col) => ({
-                                        accessorKey: col.id,
-                                        header: col.columnDef.header,
-                                    })) || [];
-
-                                    // Validate data before exporting
-                                    if (!tableData.length || !columns.length) {
-                                        console.error("Table data or columns are invalid");
-                                        return;
-                                    }
-
-                                    exportTableToJSON(tableData, columns);
-                                }}
+                                onClick={() => jsonInputRef.current?.click()} // open file dialog for JSON
                             >
                                 <Braces />
-                                JSON
+                                Importar JSON
                             </Button>
+                            <input
+                                ref={jsonInputRef}
+                                type="file"
+                                accept=".json"
+                                className="hidden"
+                                onChange={(e) =>
+                                    importJSONtoTable(
+                                        e,
+                                        organizationName,
+                                        categoryName,
+                                        setDataAction,
+                                        toast
+                                    )
+                                }
+                            />
                         </DropdownMenuContent>
                     </DropdownMenu>
+                    {/* Export to a wider variety of formats */}
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="outline" className="ml-auto">
+                                Exportar
+                                <ChevronDown/>
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start" className="items-start">
+                            <TooltipProvider>
+                                <Tooltip>
+                                    <TooltipTrigger>
+                                        <Button
+                                            variant="ghost"
+                                            onClick={() => {
+                                                const tableData = table.getRowModel()?.rows?.map((row) => row.original) || [];
+                                                const columns = table.getAllColumns()?.map((col) => ({
+                                                    accessorKey: col.id,
+                                                    header: col.columnDef.header,
+                                                })) || [];
+
+                                                // Validate the data before exporting
+                                                if (!tableData.length || !columns.length) {
+                                                    console.error("Table data or columns are invalid");
+
+                                                    return;
+                                                }
+
+                                                exportTableToPDF(organizationName, categoryTitles[categoryName], data, columns);
+                                            }}
+                                        >
+                                            <FileText/>
+                                            PDF
+                                        </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                        <p>Óptimo para imprimir, enviar y presentar</p>
+                                    </TooltipContent>
+                                </Tooltip>
+                                <Tooltip>
+                                    <TooltipTrigger>
+                                        <Button
+                                            variant="ghost"
+                                            onClick={() => exportTableToExcel(
+                                                organizationName === "nebrija" ? "Instituto Nebrija" :
+                                                    organizationName === "alcazaren" ? "Alcazarén Formación" :
+                                                        organizationName === "puenteuropa" ? "IFPS Puenteuropa" :
+                                                            organizationName === "cnse" ? "Fundación CNSE" : organizationName,
+                                                categoryName,
+                                                data,
+                                                columns
+                                            )}
+                                        >
+                                            <Sheet/>
+                                            Excel
+                                        </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                        <p>Óptimo para edición y análisis en hojas de cálculo</p>
+                                    </TooltipContent>
+                                </Tooltip>
+                                <Tooltip>
+                                    <TooltipTrigger>
+                                        <Button
+                                            variant="ghost"
+                                            onClick={() => exportTableToCSV(
+                                                organizationName === "nebrija" ? "Instituto Nebrija" :
+                                                    organizationName === "alcazaren" ? "Alcazarén Formación" :
+                                                        organizationName === "puenteuropa" ? "IFPS Puenteuropa" :
+                                                            organizationName === "cnse" ? "Fundación CNSE" : organizationName,
+                                                categoryName,
+                                                data,
+                                                columns
+                                            )}
+                                        >
+                                            <FileSpreadsheet/>
+                                            CSV
+                                        </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                        <p>Óptimo para integraciones con sistemas y bases de datos</p>
+                                    </TooltipContent>
+                                </Tooltip>
+                                <Tooltip>
+                                    <TooltipTrigger>
+                                        <Button
+                                            variant="ghost"
+                                            onClick={() => {
+                                                const tableData = table.getRowModel()?.rows?.map((row) => row.original) || [];
+                                                const columns = table.getAllColumns()?.map((col) => ({
+                                                    accessorKey: col.id,
+                                                    header: col.columnDef.header,
+                                                })) || [];
+
+                                                // Validate data before exporting
+                                                if (!tableData.length || !columns.length) {
+                                                    console.error("Table data or columns are invalid");
+                                                    return;
+                                                }
+
+                                                exportTableToJSON(tableData, columns);
+                                            }}
+                                        >
+                                            <Braces/>
+                                            JSON
+                                        </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                        <p>Óptimo para transferir datos entre sistemas y APIs</p>
+                                    </TooltipContent>
+                                </Tooltip>
+                            </TooltipProvider>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                    {/* Column visibility switch */}
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button variant="outline" className="ml-auto">
                                 Columnas
-                                <ChevronDown />
+                                <ChevronDown/>
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
@@ -713,15 +833,15 @@ export function DataTable<TData extends Product, TValue>({                      
                         className="max-w-sm ml-4"
                     />
                     <Button
-                        className="ml-auto bg-blue-600"
+                        className="ml-auto bg-yellow-500 hover:bg-yellow-600"
                         onClick={addNewRow} // Add a new row each click
                     >
-                        <Plus />
+                        <Plus/>
                     </Button>
                 </div>
             </div>
             {/* Table rendering remains unchanged */}
-            <div className="rounded-md border max-h-full sm:w-[75%] xl:w-full">
+            <div className="rounded-md border sm:w-[75%] xl:w-full">
                 <Table key={table.getRowModel().rows.length} id="exportableTable">
                     {/* Table Header */}
                     <TableHeader>
@@ -794,10 +914,10 @@ export function DataTable<TData extends Product, TValue>({                      
                                         >
                                             {editableRows[row.original.id] ? (
                                                 <span className="text-green-600">
-                                                    <CircleCheckBig />
+                                                    <CircleCheckBig/>
                                                 </span> // Save icon
                                             ) : (
-                                                <Pencil /> // Edit icon
+                                                <Pencil/> // Edit icon
                                             )}
                                         </Button>
                                     </TableCell>
@@ -884,7 +1004,7 @@ export function DataTable<TData extends Product, TValue>({                      
                                         size="sm"
                                         disabled={true}
                                     >
-                                        <Pencil />
+                                        <Pencil/>
                                     </Button>
                                 </TableCell>
                             </TableRow>
@@ -893,21 +1013,54 @@ export function DataTable<TData extends Product, TValue>({                      
                 </Table>
             </div>
             {/* Save Changes Button */}
-            <div className="flex flex-row space-between py-4">
+            <div className="flex flex-row space-between py-4 mb-4">
                 <div className="flex-1 text-sm text-muted-foreground">
-                    <Button
-                        variant={
-                            table.getFilteredSelectedRowModel().rows.length > 0 ? "destructive" : "outline"
-                        }
-                        size="sm"
-                        onClick={handleDelete}
-                        disabled={table.getFilteredSelectedRowModel().rows.length === 0}
-                        className="mr-3"
-                    >
-                        <Trash2 />
-                    </Button>
+                    <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+                        <AlertDialogTrigger asChild>
+                            <Button
+                                variant={
+                                    table.getFilteredSelectedRowModel().rows.length > 0 ? "destructive" : "outline"
+                                }
+                                size="sm"
+                                onClick={handleDelete}
+                                disabled={table.getFilteredSelectedRowModel().rows.length === 0}
+                                className="mr-3"
+                            >
+                                <Trash2/>
+                            </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>¿Estás completamente seguro?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    Esta acción no se puede deshacer. Se eliminarán permanentemente los datos
+                                    seleccionados sin opción de recuperación.
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel
+                                    onClick={() => {
+                                        setRowSelection(0);
+                                    }}
+                                >
+                                    Cancelar
+                                </AlertDialogCancel>
+                                <AlertDialogAction
+                                    onClick={() => {
+                                        setConfirmDelete(true);
+                                        setShowDeleteDialog(false);
+                                        handleDelete();
+                                    }}
+                                    className="bg-destructive hover:bg-red-700"
+                                >
+                                    Continuar
+                                </AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
+
                     {table.getFilteredSelectedRowModel().rows.length} de&nbsp;
-                    {table.getFilteredRowModel()?.rows?.length || 0 } fila(s) seleccionadas.
+                    {table.getFilteredRowModel()?.rows?.length || 0} fila(s) seleccionadas.
                 </div>
                 <div className="flex items-center justify-end space-x-2 mr-3">
                     <Button
@@ -930,14 +1083,13 @@ export function DataTable<TData extends Product, TValue>({                      
                 <Button
                     variant="default"
                     size="sm"
-                    className="bg-blue-600 text-white hover:bg-blue-700"
+                    className="bg-yellow-500 text-white hover:bg-yellow-600"
                     onClick={saveChanges}
                     disabled={!isNewRowValid()}
                 >
                     Guardar cambios
                 </Button>
             </div>
-            {/*TODO: Alert yet to be added*/}
-        </div>
+        </SidebarProvider>
     );
 }

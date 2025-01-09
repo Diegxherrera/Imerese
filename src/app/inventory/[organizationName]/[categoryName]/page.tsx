@@ -69,7 +69,7 @@ export default function DataTablePage() {
         <DataTable
             columns={columns}
             data={data}
-            setDataAction={setData}f
+            setDataAction={setData}
             categoryName={categoryName}
             organizationName={organizationName}
         />
